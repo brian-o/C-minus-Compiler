@@ -15,12 +15,8 @@
     Modified by Brian O'Dell April, 2017
 */
 
-
 #include <string.h>
 #include "symtable.h"
-
-
-
 char * CreateTemp()
 {    char hold[100];
      char *s;
@@ -50,7 +46,7 @@ struct SymbTab * Insert(char *name, enum OPERATORS Type, int isafunc, int  level
     else
     {
       struct SymbTab *p;
-      p= (SymbTab *) malloc(sizeof(struct SymbTab));
+      p= malloc(sizeof(struct SymbTab));
       p->name=name;
       p->offset=offset;  /* assign the offset */
       p->level=level;  /* assign the level */

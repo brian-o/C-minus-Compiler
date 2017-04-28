@@ -14,53 +14,78 @@
 
 */
 
-#include "ast.h"
+#include "emit.h"
 
-
-/* uses malloc to create an ASTnode and passes back the heap address of
-the newly created node */
-ASTnode *ASTCreateNode(enum ASTtype mytype)
+/**
+ * Helper function to emit a line to a file, accepts:
+ * a file pointer, a label, a command, and a comment
+ * will use stdout for now instead of fp
+ */
+void emitf( char * label, char * cmd, char * comment)
 {
-    ASTnode * p;
-    if (debug)
-        fprintf(stderr,"Creating AST Node \n");
-    p=(ASTnode *)malloc(sizeof(ASTnode));
-    p->type=mytype;
-    p->left=NULL;
-    p->right=NULL;
-    p->s1=NULL;
-    p->s2=NULL;
-    p->value=0;
-    p->name=NULL;
-    p->symbol=NULL;
-    p->isType=null;
-    return(p);
+   sprintf(s,"%s\t%s\t\t%s\n",label,cmd,comment);
+   fprintf(stdout,s);
 }
 
-/* attach q to the left most part of p */
-void ASTattachleft(ASTnode* p,ASTnode* q)
+//function to emit edentifier code so that t2 is the direct
+//access into memory for the identifier
+void emit_ident (ASTnode * p)
 {
-    while (p->left !=NULL)
-        p=p->left;
-    p->left=q; /*add on the left side of the tree*/
+ //check for scalar vs array
+  if (p->right == NULL)
+  {
+    //is scalar
+    sprintf(s,"li\t$t2\t%d",p->symbol->offset*WORDSIZE);
+    emitf("",s,"# Load ID offset into $t2");
+    emitf("","add\t$t2\t$t2\t$sp","# Create exact mem location for ID");
+  }
+  else
+  {
+    //is an array
+  }
 }
 
-void PT(int howmany){
-    int i;
-    for (i=0; i < howmany; i++)
-        printf(" "); /* print tabbing blanks */
-}
+void emit_expr(ASTnode * p)
+{
+ //left hand side first
+  switch(p->left->type) {
+    case NUMBER:
+      //li $t0 %d, p->left->value
+      break;
+    case IDENT:
+      emit_ident(p->left);
+      printf("lw $t0 ($t2) #LHS is an ID");
+      break;
+    default:
+      printf("unhandled type in emit_expr");
+      //exit(1);
+   }
+   //need to store t0 bc RHS could mess it up
+   switch(p->right->type) {
+     case NUMBER:
+      //li $t1 %d, p->right->value
+      break;
+    case IDENT:
+      emit_ident(p->right);
+      printf("lw $t1 ($t2) #RHS is an ID");
+      break;
+    default:
+      printf("unhandled type in emit_expr");
+      //exit(1);
+   }
+   //need to restore t0 after handling RHS
+}//end emit_expr
 
 /*  Print out the abstract syntax tree */
-void ASTprint(int level,ASTnode* p) //level, how many spaces 0 is left justified
+void emitAST(ASTnode* p)
 {
     if (p == NULL ) return;
     else {
-        PT(level);
         switch (p->type) {
+	
         case VARDEC :
             printf("Variable  "); //one per ast node type
-            if ((p->op) == INTDEC)
+            /*if ((p->op) == INTDEC)
                 printf("INT ");
 
             if (p->op == VOIDDEC)
@@ -71,6 +96,7 @@ void ASTprint(int level,ASTnode* p) //level, how many spaces 0 is left justified
                 printf("[%d]",p->value);
 
             printf("\n"); //finish with new line
+            */
             break;
 
         case FUNCTIONDEC:
@@ -81,7 +107,8 @@ void ASTprint(int level,ASTnode* p) //level, how many spaces 0 is left justified
                 printf("VOID ");
 
             printf("FUNCTION %s \n",p->name);
-            /*print parameter list*/
+            //print parameter list
+	    /*
             if (p->s1 == NULL) {
                 PT(level+2);
                 printf( "(VOID)\n" );
@@ -95,13 +122,14 @@ void ASTprint(int level,ASTnode* p) //level, how many spaces 0 is left justified
                 printf(") \n");
             }//end else
             //recursively print the block statment
-            ASTprint(level+2,p->right);
+            */
+            emitAST(p->right);
             break;
 
         case EXPR: printf("EXPR ");
             if (p->name != NULL)
                 printf("  %s = ", p->name);
-
+/*
             //switch through the different ops in an expression
             switch (p->op){
                 case PLUS: printf("+");
@@ -145,45 +173,53 @@ void ASTprint(int level,ASTnode* p) //level, how many spaces 0 is left justified
            //recursively print left and right side of expression
            ASTprint(level+1, p->left);
            ASTprint(level+1, p->right);
+	   */
            break;//EXPR break
 
         case  RETURNSTMT:
-            printf("Return statement\n");
+ /*           printf("Return statement\n");
             //recursively print return expression
             ASTprint(level+1, p->right);
             break;
-
+*/
         case IDENT:
-            printf("IDENTIFIER %s\n", p->name);
-            if (p->right != NULL) {
-                PT(level);
-                printf("Array reference [\n");
-                //recursively print everything in the array reference
-                ASTprint(level+1,p->right);
-                PT(level);
-                printf("] end array\n");
-            } //end if
+            emit_ident(p);
             break;
 
         case BLOCK:
             printf("BLOCK STATEMENT\n");
             //recursively print the contents of the block statement
-            ASTprint(level+1,p->right);
+            emitAST(p->right);
             break;
 
 
         case READSTMT:
-            printf("READ STATEMENT\n");
-            //recursively print the expression to be read
-            ASTprint(level+1,p->right);
+            emit_ident(p->right);
+	    printf(" li $v0 5 #read in an integer\n");
+	    printf("syscall #call a READ NUMBER FUNCITON\n");
+	    printf("sw $v0 ($t2) #store a READ number in t2\n");
             break;
 
         case WRITESTMT:
-            printf("WRITE STATEMENT\n");
-            //recursively print the expression to be written
-            ASTprint(level+1,p->right);
+            switch (p->right->type) {
+	      case NUMBER:
+		sprintf(s,"li\t$a0\t%d",p->right->value);
+		emitf("",s,"# Write a Number to the screen");
+		break;
+	      case EXPR:
+		emitAST(p->right);
+		printf("lw $a0 %d($sp) #fetch expr value\n",p->right->symbol->offset*4);
+		break;
+	      case CALLSTMT:
+		break;
+	      case IDENT:
+		emit_ident(p->right);
+		printf("lw $a0 ($t2) #put stuff in a0\n");
+		break;
+	    }
+	    printf("syscall\n");
             break;
-
+/*
         case ASSIGN:
             printf("Assignment STATEMENT\n");
             //recursively print var to be assigned and expression on right
@@ -266,31 +302,19 @@ void ASTprint(int level,ASTnode* p) //level, how many spaces 0 is left justified
             //recursively print out the expression Statement
             ASTprint(level+1, p->right);
             break;
-
-        default: printf("Unknown type in ASTprint\n");
+*/
+        default: printf("Unknown type in emitAST\n");
         //if we hit default there was an error
             break;
 
         } //end switch p->type
 
         if (p->type != EXPR) //go left for all except expression
-            ASTprint(level, p->left);
+            emitAST(p->left);
     }//end else
-}//end ASTprint
-
-/*used to compare parms declared to the ones used to call*/
-int compareFormals(ASTnode * p, ASTnode * q)
-{
-    if((p==NULL) && (q==NULL))
-        return(1); //they were both void
-    else if ((p==NULL) || (q==NULL))
-        return (0); //one is void, already checked for both so p!=q
-    else if(p->isType == q->right->isType)
-        compareFormals(p->left, q->left); //check the next param
-    else
-    {
-        printf ("Comparing p %d and q %d \n",p->isType,q->isType);
-        return(0);
-    }
-    //we shouldn't get here if we did something went wrong
+}//end emitAST
+/*
+int main(){
+  int x;
 }
+*/

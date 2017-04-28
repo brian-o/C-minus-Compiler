@@ -12,9 +12,9 @@
 
 #ifndef ASTH
 #define ASTH
-
 #include<stdio.h>
 #include<malloc.h>
+
 static int debug;
 
 /* define the enumerated types for the AST.  THis is used to tell us what

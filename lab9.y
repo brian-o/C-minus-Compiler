@@ -19,6 +19,7 @@ the propertiesthey have.
 #include <ctype.h>
 #include "symtable.c"
 #include "ast.c"
+#include "emit.c"
 #include "lex.yy.c"
 static int level=0;
 static int offset=0;
@@ -696,11 +697,14 @@ int main(int argc, char const *argv[]) {
             debug=1;
     }
     yyparse();
-    fprintf(stderr,"\nMain symbol table");
+    /*fprintf(stderr,"\nMain symbol table");
     Display();
     fprintf(stderr,"the input has been syntactically checked\n");
     fprintf(stderr, "starting print\n*\n*\n*\n*\n*\n");
-    ASTprint(0,prog);  /* this is where we can do things with the AST like
-                        print it or process it */;
+    */
+    //ASTprint(0,prog);  /* this is where we can do things with the AST like
+                        //print it or process it */;
+    printf("\n\n");
+    emitAST(prog);
     return(0);
 }

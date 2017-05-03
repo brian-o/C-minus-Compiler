@@ -8,6 +8,7 @@ FILE * fp;
 void emit(FILE * fp, char * label, char * cmd, char * comment);
 void emit_ident(ASTnode * p);
 void emit_expr(ASTnode * p);
+void emit_iteration(ASTnode * p);
 void emitAST(ASTnode * p);
 
 #endif /* of EMTAST */

@@ -98,7 +98,8 @@ varDecl         : typeSpec ID ';'
                     $$->symbol=Insert($2,$1,0,level,1,offset,NULL);
                     $$->isType=$1;
                     offset += 1;
-                    maxoffset += 1;
+                    if(offset > maxoffset)
+                        maxoffset = offset;
 
                     if (debug){
                         Display();
@@ -128,7 +129,8 @@ varDecl         : typeSpec ID ';'
                     $$->symbol=Insert($2,$1,2,level,$4,offset,NULL);
                     $$->isType=$1;
                     offset += $4;
-                    maxoffset += $4;
+                    if (offset>maxoffset)
+                        maxoffset = offset;
 
                     if (debug){
                         Display();
@@ -153,7 +155,8 @@ funDecl         : typeSpec ID '('
                     Insert($2,$1,1,level,1,0,NULL);
                     goffset=offset;
                     offset=2;
-                    maxoffset=2;
+                    if(offset>maxoffset)
+                        maxoffset = offset;
                 }
                     params
                 {   /*need the formal params to compare later */
@@ -236,7 +239,8 @@ param           : typeSpec ID
                     $$->isType=$1;
                     $$->symbol=Insert($2,$1,0,level+1,1,offset,NULL);
                     offset+=1;
-                    maxoffset += 1;
+                    if(offset>maxoffset)
+                        maxoffset = offset;
                     if(debug) Display();
                 }
                 | typeSpec ID '[' ']'
@@ -258,7 +262,8 @@ param           : typeSpec ID
                     /*2 is used for IsAFunc to show its an array ref*/
                     $$->symbol=Insert($2,$1,2,level+1,1,offset,NULL);
                     offset+=1;
-                    maxoffset+=1;
+                    if(offset>maxoffset)
+                        maxoffset = offset;
                 }
                 ;
 
@@ -553,7 +558,8 @@ simpleExpression: addExpression {$$ = $1;}
                     $$->name=CreateTemp();
                     $$->symbol=Insert($$->name,$$->isType,0,level,1,offset,NULL);
                     offset+=1;
-                    maxoffset += 1;
+                    if(offset>maxoffset)
+                        maxoffset = offset;
                 }
                 ;
 
@@ -586,7 +592,8 @@ addExpression   : term {$$ = $1;}
                     $$->name=CreateTemp();
                     $$->symbol=Insert($$->name,$$->isType,0,level,1,offset,NULL);
                     offset+=1;
-                    maxoffset +=1;
+                    if(offset>maxoffset)
+                        maxoffset = offset;
                 }
                 ;
 
@@ -615,7 +622,8 @@ term            : factor {$$ = $1;}
                     $$->name=CreateTemp();
                     $$->symbol=Insert($$->name,$$->isType,0,level,1,offset,NULL);
                     offset+=1;
-                    maxoffset +=1;
+                    if(offset>maxoffset)
+                        maxoffset = offset;
                 }
                 ;
 

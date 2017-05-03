@@ -33,7 +33,57 @@ void emit(FILE * fp, char * label, char * cmd, char * comment)
 //access into memory for the identifier
 void emit_ident(ASTnode * p)
 {   //check to see if it is a global
-    if(p->symbol->level!=0){
+    if(p->symbol->level==0)
+    {
+        if (p->right == NULL)
+        {
+            sprintf(s,"la  $t2, %s",p->name);
+            emit(fp, "",s,"# Load ID from data segment into $t2");
+        }
+        else
+        {
+            //is an array
+            switch(p->right->type){
+                //will load array offset, id offset and add them to get final offset
+                case NUMBER:
+                sprintf(s,"la  $t2, %s",p->name);
+                emit(fp,"",s,"#Get ID address from data segment");
+                sprintf(s,"li  $t3, %d",p->right->value*WORDSIZE);
+                emit(fp,"",s,"#Get array offset for the ID");
+                emit(fp,"","add $t2, $t2, $t3","#Add array offset to ID address");
+                break;
+
+                //do the expression, get id offset, get array offset*WORDSIZE
+                //add them, and value will be final offset
+                case EXPR:
+                emit_expr(p->right);
+                sprintf(s,"la  $t2, %s",p->name);
+                emit(fp,"",s,"#Get ID address from data segment");
+                sprintf(s,"lw  $t3, %d($sp)",p->right->symbol->offset*WORDSIZE);
+                emit(fp,"",s,"#Load array offset");
+                sprintf(s,"sll $t3, $t3, %d",WORDSIZE/2);
+                emit(fp,"",s,"#Mutliply array offset by WORDSIZE");
+                emit(fp,"","add $t2, $t2, $t3","#Add array offset to ID address");
+                break;
+
+                //get the id, its loc is in t2, move it to t3 and mult by WORDSIZE
+                //add id offset and array offset, result is final offset
+                case IDENT:
+                emit_ident(p->right);
+                emit(fp,"","lw  $t3, ($t2)","#Move the ID value out of the way");
+                sprintf(s,"sll $t3, $t3, %d",WORDSIZE/2);
+                emit(fp,"",s,"#Mutliply array offset by WORDSIZE");
+                sprintf(s,"la  $t2, %s",p->name);
+                emit(fp,"",s,"#Get ID address from data segment");
+                emit(fp,"","add $t2, $t2, $t3","#Add array offset to ID address");
+                break;
+            }//end switch
+        }//end else is an array
+    }//end ifis a global
+
+    //is not a global
+    else
+    {
         //check for scalar vs array
         if (p->right == NULL)
         {
@@ -83,12 +133,7 @@ void emit_ident(ASTnode * p)
                 break;
             }//end switch
         }//end else is an array
-    }//endif is not global
-    //is a global
-    else
-    {
-        
-    }
+    }//end if is not global
 }//end emit_ident
 
 
@@ -320,7 +365,7 @@ void emitAST(ASTnode* p)
             if(p->symbol->level == 0)
             {
                 emit(fp,"",".data","#Indicates we are in data segment");
-                sprintf(s,"%s:  word  %d",p->symbol->name,p->symbol->mysize*WORDSIZE);
+                sprintf(s,"%s: .space  %d",p->symbol->name,p->symbol->mysize*WORDSIZE);
                 emit(fp,s,"","");
             }
             break;

@@ -24,11 +24,12 @@ the propertiesthey have.
 static int level=0;
 static int offset=0;
 static int goffset=0;
+static int maxoffset=0;
 
 void yyerror (s)  /* Called by yyparse on error */
      char *s;
 {
-  printf ("%s On Line: %d\n", s, lineNum);
+  fprintf (stderr,"%s On Line: %d\n", s, lineNum);
 }
 
 /*Definition of start, tokens, and left association*/
@@ -83,9 +84,9 @@ varDecl         : typeSpec ID ';'
                     to the symbol table entry */
                     if(Search($2,level,0))
                     {
-                        printf("\n\tThe name %s exists at level %d ",$2,level);
-                        printf("already in the symbol table\n");
-                        printf("\tDuplicate can.t be inserted(found in search)");
+                        fprintf(stderr,"\n\tThe name %s exists at level %d ",$2,level);
+                        fprintf(stderr,"already in the symbol table\n");
+                        fprintf(stderr,"\tDuplicate can.t be inserted(found in search)");
                         yyerror();
                         exit(1);
                     }
@@ -97,6 +98,7 @@ varDecl         : typeSpec ID ';'
                     $$->symbol=Insert($2,$1,0,level,1,offset,NULL);
                     $$->isType=$1;
                     offset += 1;
+                    maxoffset += 1;
 
                     if (debug){
                         Display();
@@ -110,9 +112,9 @@ varDecl         : typeSpec ID ';'
                 {   /* search for symbol, if we find it error*/
                     if(Search($2,level,0))
                     {
-                        printf("\n\tThe name %s exists at level %d ",$2,level);
-                        printf("already in the symbol table\n");
-                        printf("\tDuplicate can.t be inserted(found in search)");
+                        fprintf(stderr,"\n\tThe name %s exists at level %d ",$2,level);
+                        fprintf(stderr,"already in the symbol table\n");
+                        fprintf(stderr,"\tDuplicate can.t be inserted(found in search)");
                         yyerror();
                         exit(1);
                     }
@@ -126,6 +128,7 @@ varDecl         : typeSpec ID ';'
                     $$->symbol=Insert($2,$1,2,level,$4,offset,NULL);
                     $$->isType=$1;
                     offset += $4;
+                    maxoffset += $4;
 
                     if (debug){
                         Display();
@@ -149,7 +152,8 @@ funDecl         : typeSpec ID '('
                     }
                     Insert($2,$1,1,level,1,0,NULL);
                     goffset=offset;
-                    offset=0;
+                    offset=2;
+                    maxoffset=2;
                 }
                     params
                 {   /*need the formal params to compare later */
@@ -173,8 +177,10 @@ funDecl         : typeSpec ID '('
                     /*Remove symbols put in, in the function call*/
                     offset -=Delete(1);
                     level = 0;
+                    $$->value=maxoffset;
                     /*change the offset back to the global offset*/
                     offset=goffset;
+                    maxoffset=0;
 
                     if (debug){
                         Display();
@@ -230,6 +236,7 @@ param           : typeSpec ID
                     $$->isType=$1;
                     $$->symbol=Insert($2,$1,0,level+1,1,offset,NULL);
                     offset+=1;
+                    maxoffset += 1;
                     if(debug) Display();
                 }
                 | typeSpec ID '[' ']'
@@ -251,6 +258,7 @@ param           : typeSpec ID
                     /*2 is used for IsAFunc to show its an array ref*/
                     $$->symbol=Insert($2,$1,2,level+1,1,offset,NULL);
                     offset+=1;
+                    maxoffset+=1;
                 }
                 ;
 
@@ -545,6 +553,7 @@ simpleExpression: addExpression {$$ = $1;}
                     $$->name=CreateTemp();
                     $$->symbol=Insert($$->name,$$->isType,0,level,1,offset,NULL);
                     offset+=1;
+                    maxoffset += 1;
                 }
                 ;
 
@@ -577,6 +586,7 @@ addExpression   : term {$$ = $1;}
                     $$->name=CreateTemp();
                     $$->symbol=Insert($$->name,$$->isType,0,level,1,offset,NULL);
                     offset+=1;
+                    maxoffset +=1;
                 }
                 ;
 
@@ -605,6 +615,7 @@ term            : factor {$$ = $1;}
                     $$->name=CreateTemp();
                     $$->symbol=Insert($$->name,$$->isType,0,level,1,offset,NULL);
                     offset+=1;
+                    maxoffset +=1;
                 }
                 ;
 
@@ -705,6 +716,8 @@ int main(int argc, char const *argv[]) {
     //ASTprint(0,prog);  /* this is where we can do things with the AST like
                         //print it or process it */;
     printf("\n\n");
+    fp = fopen("test.asm","w");
+    if(fp == NULL) exit(1);
     emitAST(prog);
     return(0);
 }

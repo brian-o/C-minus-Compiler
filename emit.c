@@ -348,6 +348,13 @@ void emit_ifstmt(ASTnode * p)
     emit(fp,s,"","# End of IF");
 }
 
+//args are in p->right
+emit_args(ASTnode * p)
+{
+  ;
+}
+
+
 
 /******************************************************************
 *
@@ -459,15 +466,15 @@ void emitAST(ASTnode* p)
 
         case ASSIGN:
             //right = var, s1 = expression
-            //Emit the expressionstmt, value will be in t0
+            //Emit the expressionstmt, value will be in t6
             //we use the whole funciton because the node is expresison stmt
             emitAST(p->s1);
-
+	    
             //Emit the ID, address will be in t2 we do this after the expression
             //Because emit_ident does not touch t0
             emit_ident(p->right);
-            //Now shove value in t0 into address at t2
-            emit(fp,"","sw  $t0, ($t2)","#Store the value in the right place");
+            //Now shove value in t6 into address at t2
+            emit(fp,"","sw  $t6, ($t2)","#Store the value in the right place");
             break;
 
         case NUMBER:
@@ -498,12 +505,22 @@ void emitAST(ASTnode* p)
         case IFSTMT:
             emit_ifstmt(p);
             break;//end of IFSTMT
-/*
+
         case CALLSTMT:
+	  if(p->right != NULL)
+	  {
+	    emit_args(p);
+	  }
+	  
+	  sprintf(s,"jal %s",p->name);
+	  emit(fp,"",s,"#jump and linkthe function");
+	  break;
+	  
+/*	  
             printf("Function Call  %s\n" , p->name);
             if (p->right != NULL){
                 //recursively print out args
-                ASTprint(level+2, p->right);
+                //ASTprint(level+2, p->right);
                 printf("\n");
             }
             //args were void
@@ -512,11 +529,12 @@ void emitAST(ASTnode* p)
                 printf("(VOID)\n");
             }
             break;
+	    
         case ARGLIST:
             printf("ARG\n");
             //this arg's expression is right, the next arg is at left
             //it gets there from the main control
-            ASTprint(level+1, p->right);
+            //ASTprint(level+1, p->right);
             break;
 */
         case EXPRSTMT:
@@ -525,19 +543,19 @@ void emitAST(ASTnode* p)
             //int t0 when we are done.
             switch (p->right->type) {
                 case NUMBER:
-                sprintf(s,"li  $t0, %d",p->right->value);
-                emit(fp,"",s,"#Load number into $t0 for if stmt");
+                sprintf(s,"li  $t6 %d",p->right->value);
+                emit(fp,"",s,"#Load number into $t6 for if stmt");
                 break;
 
                 case EXPR:
                 emitAST(p->right);
-                sprintf(s,"lw  $t0, %d($sp)",p->right->symbol->offset*WORDSIZE);
-                //TODO: move symbol into t0
+                sprintf(s,"lw  $t6, %d($sp)",p->right->symbol->offset*WORDSIZE);
+                emit(fp,"",s,"#load the value from the stack into t6");
                 break;
 
                 case IDENT:
                 emit_ident(p->right);
-                emit(fp,"","lw  $t0, ($t2)", "#Load the value from the stack into t0 for ifstmt");
+                emit(fp,"","lw  $t6, ($t2)", "#Load the value from the stack into t0 for ifstmt");
                 break;
 
                 case CALLSTMT:

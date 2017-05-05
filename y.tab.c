@@ -2479,11 +2479,11 @@ int main(int argc, char const *argv[]) {
             fprintf(stderr,"file name is %s\n",argv[++i]);
             strcpy(f,argv[i]);
             strcat(f,".asm");
-            fprintf(stderr,"opening %s",f);
+            fprintf(stderr,"opening %s\n",f);
             fp = fopen(f,"w");
             if (fp==NULL)
             {
-                fprintf(stderr,"Cannot open %s",f);
+                fprintf(stderr,"Cannot open %s\n",f);
                 exit(1);
             }
         }//end if -o set

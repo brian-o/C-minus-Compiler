@@ -1,19 +1,19 @@
-/* A Bison parser, made by GNU Bison 3.0.4.  */
+/* A Bison parser, made by GNU Bison 2.7.  */
 
 /* Bison interface for Yacc-like parsers in C
-
-   Copyright (C) 1984, 1989-1990, 2000-2015 Free Software Foundation, Inc.
-
+   
+      Copyright (C) 1984, 1989-1990, 2000-2012 Free Software Foundation, Inc.
+   
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
    (at your option) any later version.
-
+   
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-
+   
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
@@ -26,13 +26,13 @@
    special exception, which will cause the skeleton and the resulting
    Bison output files to be licensed under the GNU General Public
    License without this special exception.
-
+   
    This special exception was added by the Free Software Foundation in
    version 2.2 of Bison.  */
 
 #ifndef YY_YY_Y_TAB_H_INCLUDED
 # define YY_YY_Y_TAB_H_INCLUDED
-/* Debug traces.  */
+/* Enabling traces.  */
 #ifndef YYDEBUG
 # define YYDEBUG 0
 #endif
@@ -40,27 +40,28 @@
 extern int yydebug;
 #endif
 
-/* Token type.  */
+/* Tokens.  */
 #ifndef YYTOKENTYPE
 # define YYTOKENTYPE
-  enum yytokentype
-  {
-    UMINUS = 258,
-    IF = 259,
-    WHILE = 260,
-    ELSE = 261,
-    RETURN = 262,
-    GE = 263,
-    LE = 264,
-    EQ = 265,
-    NE = 266,
-    READ = 267,
-    WRITE = 268,
-    INT = 269,
-    VOID = 270,
-    NUM = 271,
-    ID = 272
-  };
+   /* Put the tokens into the symbol table, so that GDB and other debuggers
+      know about them.  */
+   enum yytokentype {
+     UMINUS = 258,
+     IF = 259,
+     WHILE = 260,
+     ELSE = 261,
+     RETURN = 262,
+     GE = 263,
+     LE = 264,
+     EQ = 265,
+     NE = 266,
+     READ = 267,
+     WRITE = 268,
+     INT = 269,
+     VOID = 270,
+     NUM = 271,
+     ID = 272
+   };
 #endif
 /* Tokens.  */
 #define UMINUS 258
@@ -79,29 +80,42 @@ extern int yydebug;
 #define NUM 271
 #define ID 272
 
-/* Value type.  */
-#if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 
-union YYSTYPE
+
+#if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
+typedef union YYSTYPE
 {
-#line 39 "lab9.y" /* yacc.c:1909  */
+/* Line 2058 of yacc.c  */
+#line 39 "lab9.y"
 
     int value;
     char * string;
     ASTnode * node;  /* so we can build an AST */
     enum OPERATORS op;
 
-#line 95 "y.tab.h" /* yacc.c:1909  */
-};
 
-typedef union YYSTYPE YYSTYPE;
+/* Line 2058 of yacc.c  */
+#line 99 "y.tab.h"
+} YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
+# define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
 #endif
 
-
 extern YYSTYPE yylval;
 
+#ifdef YYPARSE_PARAM
+#if defined __STDC__ || defined __cplusplus
+int yyparse (void *YYPARSE_PARAM);
+#else
+int yyparse ();
+#endif
+#else /* ! YYPARSE_PARAM */
+#if defined __STDC__ || defined __cplusplus
 int yyparse (void);
+#else
+int yyparse ();
+#endif
+#endif /* ! YYPARSE_PARAM */
 
 #endif /* !YY_YY_Y_TAB_H_INCLUDED  */

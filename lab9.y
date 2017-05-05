@@ -181,6 +181,10 @@ funDecl         : typeSpec ID '('
                     offset -=Delete(1);
                     level = 0;
                     $$->value=maxoffset;
+                    //we change this in the symbol table because it is not used
+                    //anywhere else. We have access to this in calls, so we can
+                    //use it to determine where the stack pointer is going to have to be
+                    $$->symbol->mysize = maxoffset;
                     /*change the offset back to the global offset*/
                     offset=goffset;
                     maxoffset=0;
@@ -443,7 +447,7 @@ returnStmt      : RETURN ';' {$$ = ASTCreateNode(RETURNSTMT);}
                 {
                     $$ = ASTCreateNode(RETURNSTMT);
                     /*expression to return*/
-                    $$->right=$2;
+                    $$->s2=$2;
                 }
                 ;
 

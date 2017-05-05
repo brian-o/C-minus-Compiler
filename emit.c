@@ -161,7 +161,13 @@ void emit_expr(ASTnode * p)
         sprintf(s,"lw  $t0, %d($sp)",p->left->symbol->offset*WORDSIZE);
         emit(fp,"",s,"#Insert the value from the LHS EXPR into t0");
         break;
-
+	
+	case CALLSTMT:
+	emit_callstmt(p->left);
+	//v0 has what we need move it into t0
+	emit(fp,"","lw  $t0, ($v0)","#Get return for LHS");
+	break;
+	
         default:
         fprintf(stderr,"unhandled type in emit_expr");
         exit(1);
@@ -179,7 +185,7 @@ void emit_expr(ASTnode * p)
 
         case IDENT:
         emit_ident(p->right);
-        emit(fp,"","lw  $t1, ($t2)"," #RHS is an ID load into t0");
+        emit(fp,"","lw  $t1, ($t2)"," #RHS is an ID load into t1");
         break;
 
         case EXPR:
@@ -187,6 +193,12 @@ void emit_expr(ASTnode * p)
         sprintf(s,"lw  $t1, %d($sp)",p->right->symbol->offset*WORDSIZE);
         emit(fp,"",s,"#Insert the value from the RHS EXPR into t1");
         break;
+	
+	case CALLSTMT:
+	emit_callstmt(p->right);
+	//v0 has what we need move it into t0
+	emit(fp,"","lw  $t1, ($v0)","#Get return for RHS");
+	break;
 
         default:
         fprintf(stderr,"unhandled type in emit_expr");
@@ -348,12 +360,100 @@ void emit_ifstmt(ASTnode * p)
     emit(fp,s,"","# End of IF");
 }
 
-//args are in p->right
+
+//we were handed p->right, an arg node
+//this function isnt called if args are void
+//from here p->right is the arg's expression
+//p->left is the next arg in the list
+//p->right should not be NULL so we will not check
 emit_args(ASTnode * p)
 {
-  ;
+  switch(p->right->type)
+  {
+      
+  }
+  
 }
 
+
+
+//when this is call we will have the return stmt in p
+emit_return_stmt(ASTnode * p)
+{
+  //there is an expression to do if something is in p->s2
+  
+      if(p->s2 != NULL){
+	    switch (p->s2->type) {
+                case NUMBER:
+                sprintf(s,"li $v0, %d",p->s2->value);
+                emit(fp,"",s,"#Load number into $v0 for return");
+                break;
+
+                case EXPR:
+                emitAST(p->s2);
+                sprintf(s,"lw  $v0, %d($sp)",p->s2->symbol->offset*WORDSIZE);
+                emit(fp,"",s,"#load the value from the stack into v0 for return");
+                break;
+
+                case IDENT:
+                emit_ident(p->s2);
+                emit(fp,"","lw  $v0, ($t2)", "#Load the value from the stack into v0 for return");
+                break;
+
+                case CALLSTMT:
+		  emitAST(p->s2);
+                break;
+
+            }
+      }//end if expr exists
+      else
+	  emit(fp,"","li $v0, 0","#Return 0 since there was no expression");
+
+	  
+   sprintf(s,"lw  $ra, %d($sp)",1*WORDSIZE);
+   emit(fp,"",s,"# Load the right value back into ra");
+            //TODO: fix this
+            
+   emit(fp,"","lw  $sp, ($sp)","#add the right value back into sp");
+   emit(fp,"","jr  $ra","");
+}
+
+
+
+emit_callstmt(ASTnode * p)
+{
+  //p->right is beginning of arglist
+    //each arg expression is in p->right
+    //the next arg in the list is p->left
+    //if p->left is NULL we are al the end of the list.
+    int offsetDownFromSP;
+    //this value is the same as maxoffset for the function
+    //made this way when creating the AST
+    //only used forclarity of what operations are happening
+    emit(fp,"","addu $t5, $sp, 0","#Save old sp into t5");
+    offsetDownFromSP = p->symbol->mysize*WORDSIZE;
+    sprintf(s,"subu $sp, $sp, %d",offsetDownFromSP);
+    emit(fp,"",s,"#temoporarily move the sp to eval the args");
+    //
+    //$t5 is now the old sp we will evaluate all the expressions
+    //in the args and put the values in the right memory addressess
+     //p->right is beginning of arglist
+    //each arg expression is in p->right
+    //the next arg in the list is p->left
+    //if p->left is NULL we are al the end of the list.
+    //no we can emit the args, using $t5 as our "sp"
+  if(p->right != NULL)
+  {
+    
+    emit_args(p->right);
+  
+  }
+  //emit 
+  emit(fp,"","addu $sp, $t5, 0","#Put sp back where it goes");
+  sprintf(s,"jal %s",p->name);
+  emit(fp,"",s,"#jump and linkthe function");
+  emit(fp,"","nop","");
+}
 
 
 /******************************************************************
@@ -389,37 +489,26 @@ void emitAST(ASTnode* p)
 
             //make the activation record
             //stackval = p->value*WORDSIZE;
-            sprintf(s,"subu $sp, $sp, %d",p->value*WORDSIZE);
-            emit(fp,"",s,"# get some space in the stack for activation record");
-            sprintf(s,"sw  $ra, %d($sp)",1*WORDSIZE);
+            sprintf(s,"subu $t0, $sp, %d",p->value*WORDSIZE);
+            emit(fp,"",s,"# put where the new sp should be in t0");
+            sprintf(s,"sw  $ra, %d($t0)",1*WORDSIZE);
             emit(fp,"",s,"# Store return adress into the stack");
+	    emit(fp,"","sw  $sp, ($t0)","# save the old sp");
+	    emit(fp,"","addu $sp, $t0, 0","#move the sp now");
 
             //TODO: Here is where the params work should go?
 
             //recursively do the block inside the dec
             emitAST(p->right);
-
-            if (strcmp("main",p->name) == 0)
-            {   emit(fp,"","li  $v0, 0","#Return 0 from main");
-                sprintf(s,"lw  $ra, %d($sp)",1*WORDSIZE);
-                emit(fp,"",s,"# Load the right value back into ra");
-                sprintf(s,"addu $sp, $sp, %d",p->value*WORDSIZE);
-                emit(fp,"",s,"#add the right value back into sp");
-                emit(fp,"","jr  $ra","");
-            }
-            break;
+	    emit_return_stmt(p);
+	    break;
 
         case EXPR:
             emit_expr(p);
             break;
 
         case RETURNSTMT:
-            sprintf(s,"lw  $ra, %d($sp)",1*WORDSIZE);
-            emit(fp,"",s,"# Load the right value back into ra");
-            //TODO: fix this
-            sprintf(s,"addu $sp, $sp, %d",p->value*WORDSIZE);
-            emit(fp,"",s,"#add the right value back into sp");
-            emit(fp,"","jr  $ra","");
+	    emit_return_stmt(p);
             break;
 
         case IDENT:
@@ -507,13 +596,7 @@ void emitAST(ASTnode* p)
             break;//end of IFSTMT
 
         case CALLSTMT:
-	  if(p->right != NULL)
-	  {
-	    emit_args(p);
-	  }
-	  
-	  sprintf(s,"jal %s",p->name);
-	  emit(fp,"",s,"#jump and linkthe function");
+	    emit_callstmt(p);
 	  break;
 	  
 /*	  
@@ -540,7 +623,8 @@ void emitAST(ASTnode* p)
         case EXPRSTMT:
             //do the right hand pointer in this node
             //can be NUMBER, EXPR, CALL, or VAR, we need the value to be
-            //int t0 when we are done.
+            //in t6 when we are done.
+	  //can switch this to a function later
             switch (p->right->type) {
                 case NUMBER:
                 sprintf(s,"li  $t6 %d",p->right->value);
@@ -559,6 +643,7 @@ void emitAST(ASTnode* p)
                 break;
 
                 case CALLSTMT:
+		  emitAST(p->right);
                 break;
 
             }

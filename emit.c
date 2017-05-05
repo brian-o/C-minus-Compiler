@@ -161,13 +161,13 @@ void emit_expr(ASTnode * p)
         sprintf(s,"lw  $t0, %d($sp)",p->left->symbol->offset*WORDSIZE);
         emit(fp,"",s,"#Insert the value from the LHS EXPR into t0");
         break;
-	
+
 	case CALLSTMT:
 	emit_callstmt(p->left);
 	//v0 has what we need move it into t0
-	emit(fp,"","lw  $t0, ($v0)","#Get return for LHS");
+	emit(fp,"","addu $t0, $v0, 0","#Get return for LHS");
 	break;
-	
+
         default:
         fprintf(stderr,"unhandled type in emit_expr");
         exit(1);
@@ -193,11 +193,11 @@ void emit_expr(ASTnode * p)
         sprintf(s,"lw  $t1, %d($sp)",p->right->symbol->offset*WORDSIZE);
         emit(fp,"",s,"#Insert the value from the RHS EXPR into t1");
         break;
-	
+
 	case CALLSTMT:
 	emit_callstmt(p->right);
 	//v0 has what we need move it into t0
-	emit(fp,"","lw  $t1, ($v0)","#Get return for RHS");
+	emit(fp,"","addu $t1, $v0, 0","#Get return for RHS");
 	break;
 
         default:
@@ -292,6 +292,8 @@ void emit_iteration(ASTnode * p)
         break;
 
         case CALLSTMT:
+        emit_callstmt(p->right);
+        emit(fp,"","lw  $t0, ($v0)","#Load value from the return for whilestmt");
         break;
     }
     //condition no satisfied jump out
@@ -366,22 +368,22 @@ void emit_ifstmt(ASTnode * p)
 //from here p->right is the arg's expression
 //p->left is the next arg in the list
 //p->right should not be NULL so we will not check
-emit_args(ASTnode * p)
+void emit_args(ASTnode * p)
 {
   switch(p->right->type)
   {
-      
+
   }
-  
+
 }
 
 
 
 //when this is call we will have the return stmt in p
-emit_return_stmt(ASTnode * p)
+void emit_return_stmt(ASTnode * p)
 {
   //there is an expression to do if something is in p->s2
-  
+
       if(p->s2 != NULL){
 	    switch (p->s2->type) {
                 case NUMBER:
@@ -409,18 +411,18 @@ emit_return_stmt(ASTnode * p)
       else
 	  emit(fp,"","li $v0, 0","#Return 0 since there was no expression");
 
-	  
+
    sprintf(s,"lw  $ra, %d($sp)",1*WORDSIZE);
    emit(fp,"",s,"# Load the right value back into ra");
             //TODO: fix this
-            
+
    emit(fp,"","lw  $sp, ($sp)","#add the right value back into sp");
    emit(fp,"","jr  $ra","");
 }
 
 
 
-emit_callstmt(ASTnode * p)
+void emit_callstmt(ASTnode * p)
 {
   //p->right is beginning of arglist
     //each arg expression is in p->right
@@ -444,11 +446,11 @@ emit_callstmt(ASTnode * p)
     //no we can emit the args, using $t5 as our "sp"
   if(p->right != NULL)
   {
-    
+
     emit_args(p->right);
-  
+
   }
-  //emit 
+  //emit
   emit(fp,"","addu $sp, $t5, 0","#Put sp back where it goes");
   sprintf(s,"jal %s",p->name);
   emit(fp,"",s,"#jump and linkthe function");
@@ -558,7 +560,7 @@ void emitAST(ASTnode* p)
             //Emit the expressionstmt, value will be in t6
             //we use the whole funciton because the node is expresison stmt
             emitAST(p->s1);
-	    
+
             //Emit the ID, address will be in t2 we do this after the expression
             //Because emit_ident does not touch t0
             emit_ident(p->right);
@@ -598,8 +600,8 @@ void emitAST(ASTnode* p)
         case CALLSTMT:
 	    emit_callstmt(p);
 	  break;
-	  
-/*	  
+
+/*
             printf("Function Call  %s\n" , p->name);
             if (p->right != NULL){
                 //recursively print out args
@@ -612,7 +614,7 @@ void emitAST(ASTnode* p)
                 printf("(VOID)\n");
             }
             break;
-	    
+
         case ARGLIST:
             printf("ARG\n");
             //this arg's expression is right, the next arg is at left

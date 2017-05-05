@@ -716,9 +716,24 @@ int main(int argc, char const *argv[]) {
         char * test = strdup(argv[i]);
         char * v1 = "-v";
         char * v2 = "--verbose";
+        char * v3 = "-o";
         if(strcmp(test,v1)==0 || strcmp(test,v2)==0)
             debug=1;
-    }
+        if(strcmp(test,v3)==0)
+        {
+            char f[100];
+            fprintf(stderr,"file name is %s\n",argv[++i]);
+            strcpy(f,argv[i]);
+            strcat(f,".asm");
+            fprintf(stderr,"opening %s\n",f);
+            fp = fopen(f,"w");
+            if (fp==NULL)
+            {
+                fprintf(stderr,"Cannot open %s\n",f);
+                exit(1);
+            }
+        }//end if -o set
+    }//end loop
     yyparse();
     /*fprintf(stderr,"\nMain symbol table");
     Display();
@@ -728,8 +743,6 @@ int main(int argc, char const *argv[]) {
     //ASTprint(0,prog);  /* this is where we can do things with the AST like
                         //print it or process it */;
     printf("\n\n");
-    fp = fopen("test.asm","w");
-    if(fp == NULL) exit(1);
     emitAST(prog);
     return(0);
 }

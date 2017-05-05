@@ -379,20 +379,13 @@ void emit_args(ASTnode * p, int argNum)
       break;
 
       case IDENT:
-      //is not an aray
-      if(p->right->right ==NULL)
-            emit_ident(p->right);
-      //it is an array and we have to do some pushups
-      else{
-          emit(fp,"","addu $t7, $sp, 0","# put the old sp in t7");
-         // emit(fp,"","lw $")
-          emit(fp,"","sw  $sp, ($t0)","# save the old sp");
-          emit(fp,"","addu $sp, $t0, 0","#move the sp now");
-          emit(fp,"","lw  $sp, ($sp)","#Put sp back where it goes");
-
-          //offsetDownFromSP
-      }
+      //emit(fp,"","addu $t7, $sp, 0","# put the old sp in t7");
+      sprintf(s,"addu $sp, $sp, %d",offsetDownFromSP);
+      emit(fp,"",s,"#move sp up temporarily");
+      emit_ident(p->right);
       emit(fp,"","lw  $t0, ($t2)"," #arg is an ID load into t0");
+      sprintf(s,"subu $sp, $sp, %d",offsetDownFromSP);
+      emit(fp,"",s,"#move sp back where it goes");
       break;
 
       case EXPR:
@@ -676,8 +669,8 @@ void emitAST(ASTnode* p)
 	  //can switch this to a function later
             switch (p->right->type) {
                 case NUMBER:
-                sprintf(s,"li  $t6 %d",p->right->value);
-                emit(fp,"",s,"#Load number into $t6 for if stmt");
+                sprintf(s,"li  $t6, %d",p->right->value);
+                emit(fp,"",s,"#Load number into $t6 for expr stmt");
                 break;
 
                 case EXPR:
@@ -688,7 +681,7 @@ void emitAST(ASTnode* p)
 
                 case IDENT:
                 emit_ident(p->right);
-                emit(fp,"","lw  $t6, ($t2)", "#Load the value from the stack into t0 for ifstmt");
+                emit(fp,"","lw  $t6, ($t2)", "#Load the value from the stack into t6 for expr stmt");
                 break;
 
                 case CALLSTMT:

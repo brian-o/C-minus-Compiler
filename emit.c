@@ -77,6 +77,16 @@ void emit_ident(ASTnode * p)
                 emit(fp,"",s,"#Get ID address from data segment");
                 emit(fp,"","add $t2, $t2, $t3","#Add array offset to ID address");
                 break;
+		
+		case CALLSTMT:
+		  emit_callstmt(p->right);
+		  emit(fp,"","addu $t3, $v0, 0","#Move return value into t3");
+		  sprintf(s,"sll $t3, $t3, %d",WORDSIZE/2);
+                emit(fp,"",s,"#Mutliply array offset by WORDSIZE");
+                sprintf(s,"la  $t2, %s",p->name);
+                emit(fp,"",s,"#Get ID address from data segment");
+                emit(fp,"","add $t2, $t2, $t3","#Add array offset to ID address");
+		  break;
             }//end switch
         }//end else is an array
     }//end ifis a global
@@ -131,6 +141,18 @@ void emit_ident(ASTnode * p)
                 emit(fp,"","add $t2, $t2, $t3","#Add array offset to ID offset");
                 emit(fp,"","add $t2, $t2, $sp","#Add the stack poitner in");
                 break;
+		
+		case CALLSTMT:
+		  emit_callstmt(p->right);
+		  emit(fp,"","addu $t3, $v0, 0","#Move return value into t3");
+		  sprintf(s,"sll $t3, $t3, %d",WORDSIZE/2);
+                emit(fp,"",s,"#Mutliply array offset by WORDSIZE");
+                sprintf(s,"li  $t2, %d",p->symbol->offset*WORDSIZE);
+                emit(fp,"",s,"#Load initial offset for the ID");
+                emit(fp,"","add $t2, $t2, $t3","#Add array offset to ID offset");
+                emit(fp,"","add $t2, $t2, $sp","#Add the stack poitner in");
+                break;
+		 
             }//end switch
         }//end else is an array
     }//end if is not global
@@ -496,6 +518,24 @@ void emit_callstmt(ASTnode * p)
 }
 
 
+void emit_assignment_stmt(ASTnode * p)
+{
+            //right = var, s1 = expression
+            //Emit the expressionstmt, value will be in t6
+            //we use the whole funciton because the node is expresison stmt
+            emitAST(p->s1);
+	    sprintf(s,"addu $t6, %d($sp)",p->symbol->offset*WORDSIZE);
+	    emit(fp,"",s,"#put the value in the write place for later");
+
+            //Emit the ID, address will be in t2 we do this after the expression
+            //Because emit_ident does not touch t0
+            emit_ident(p->right);
+            //Now shove value in t6 into address at t2
+	    sprintf(s,"lw $t6, %d($sp)",p->symbol->offset*WORDSIZE);
+            emit(fp,"","sw  $t6, ($t2)","#Store the value in the right place");
+}
+
+
 /******************************************************************
 *
 * start of emitAST
@@ -596,10 +636,12 @@ void emitAST(ASTnode* p)
             break;
 
         case ASSIGN:
+	  emit_assignment(p);
             //right = var, s1 = expression
             //Emit the expressionstmt, value will be in t6
             //we use the whole funciton because the node is expresison stmt
             emitAST(p->s1);
+	    
 
             //Emit the ID, address will be in t2 we do this after the expression
             //Because emit_ident does not touch t0

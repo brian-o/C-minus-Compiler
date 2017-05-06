@@ -403,6 +403,7 @@ expStmt         : expression ';'
                     $$=ASTCreateNode(EXPRSTMT);
                     $$->right=$1;
                     $$->isType=$1->isType;
+                    
 
                     if (debug){
                         fprintf(stderr, "Finished creating an expression Statement");
@@ -488,6 +489,11 @@ assignStmt      : var '=' expStmt
                     /*inherit the type, already check for equivalence
                     so can just use $1*/
                     $$->isType=$1->isType;
+                    $$->name=CreateTemp();
+                    $$->symbol=Insert($$->name,$$->isType,0,level,1,offset,NULL);
+                    offset+=1;
+                    if(offset>maxoffset)
+                        maxoffset = offset;
                 }
                 ;
 

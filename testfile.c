@@ -13,6 +13,7 @@ int doubleit(int a){
 
 int on;
 int off[5];
+int off2[5];
 
 void main(void){
     int a;
@@ -27,10 +28,11 @@ void main(void){
     b[7] = 77;
     b[8] = 88;
     b[9] = 99;
+    f(2+2,2<3);
     a = 5;
     f(a,9);
-    a = 3;
-    f(a,f(6,9));
+    a = 12;
+    f(a,f(9,f(3,6)));
     a = ret42();
     write a;
     a = doubleit(a);
@@ -56,5 +58,25 @@ void main(void){
         write a;
         a = a+b[0]/10;
     }
-
+    off[0] = 23;
+    off[1] = 24;
+    off[2] = 25;
+    off[3] = 26;
+    off[4] = 27;
+    off2[0] = 34;
+    off2[1] = 35;
+    off2[2] = 36;
+    off2[3] = 37;
+    off2[4] = 38;
+    
+    write off[0];
+    write off[1];
+    write off[2];
+    write off[3];
+    write off[4];
+    write off2[0];
+    write off2[1];
+    write off2[2];
+    write off2[3];
+    write off2[4];
 }

@@ -399,12 +399,12 @@ void emit_args(ASTnode * p, int argNum)
 
         case IDENT:
         //emit(fp,"","addu $t7, $sp, 0","# put the old sp in t7");
-        sprintf(s,"addu $sp, $sp, %d",offsetDownFromSP);
-        emit(fp,"",s,"#move sp up temporarily");
+        //sprintf(s,"addu $sp, $sp, %d",offsetDownFromSP);
+        //emit(fp,"",s,"#move sp up temporarily");
         emit_ident(p->right);
         emit(fp,"","lw  $t0, ($t2)"," #arg is an ID load into t0");
-        sprintf(s,"subu $sp, $sp, %d",offsetDownFromSP);
-        emit(fp,"",s,"#move sp back where it goes");
+        //sprintf(s,"subu $sp, $sp, %d",offsetDownFromSP);
+       // emit(fp,"",s,"#move sp back where it goes");
         break;
 
         case EXPR:
@@ -423,8 +423,15 @@ void emit_args(ASTnode * p, int argNum)
         fprintf(stderr,"unhandled type in emit_expr");
         exit(1);
     }//end switch for arg type
+    sprintf(s,"subu $t6, $sp, %d",offsetDownFromSP);
+    emit(fp,"",s,"# put where the new sp should be in t0");
+    emit(fp,"","sw  $sp, ($t6)","# save the old sp");
+    emit(fp,"","addu $sp, $t6, 0","#move the sp now");
+    
+    
     sprintf(s,"sw  $t0 %d($sp)",(argNum+1)*WORDSIZE);
     emit(fp,"",s,"#store the value of arg into the stack");
+    emit(fp,"","lw  $sp, ($sp)","#Put sp back where it goes");
 
     if(p->left != NULL)
         emit_args(p->left,argNum +1);
@@ -486,11 +493,7 @@ void emit_callstmt(ASTnode * p)
         //made this way when creating the AST
         //only used forclarity of what operations are happening
         offsetDownFromSP = p->symbol->mysize*WORDSIZE;
-        sprintf(s,"subu $t0, $sp, %d",offsetDownFromSP);
-        emit(fp,"",s,"# put where the new sp should be in t0");
-
-        emit(fp,"","sw  $sp, ($t0)","# save the old sp");
-        emit(fp,"","addu $sp, $t0, 0","#move the sp now");
+       
         //$t5 is now the old sp we will evaluate all the expressions
         //in the args and put the values in the right memory addressess
          //p->right is beginning of arglist
@@ -499,7 +502,7 @@ void emit_callstmt(ASTnode * p)
         //if p->left is NULL we are al the end of the list.
         //no we can emit the args, using $t5 as our "sp"
         emit_args(p->right,1);
-        emit(fp,"","lw  $sp, ($sp)","#Put sp back where it goes");
+       
     }//end if there are args
 
     sprintf(s,"jal %s",p->name);

@@ -32,6 +32,7 @@ ASTnode *ASTCreateNode(enum ASTtype mytype)
     p->s2=NULL;
     p->value=0;
     p->name=NULL;
+    p->str = NULL;
     p->symbol=NULL;
     p->isType=null;
     return(p);

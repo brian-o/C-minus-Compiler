@@ -39,7 +39,8 @@ enum ASTtype {
    RETURNSTMT,
    READSTMT,
    WRITESTMT,
-   PARAM
+   PARAM,
+   STRINGNODE
 };
 
 
@@ -56,6 +57,7 @@ enum OPERATORS {
    NOTEQUAL,
    INTDEC,
    VOIDDEC,
+   STRINGDEC,
    null
 };
 
@@ -68,6 +70,7 @@ typedef struct ASTnodetype
      enum OPERATORS op;
      enum OPERATORS isType;
      char * name;
+     char * str;
      int value;
      struct SymbTab * symbol;
      struct ASTnodetype *left,*right; /* left is usually the connector for statements */

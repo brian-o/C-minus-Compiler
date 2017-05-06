@@ -44,6 +44,10 @@ return              {if(mydebug)
                         fprintf(stderr,"%s\n",yytext);
                     return RETURN;}
 
+string              {
+                    return STRING;
+                    }
+
 write               {if(mydebug)
                         fprintf(stderr,"%s\n",yytext);
                     return WRITE;}
@@ -81,6 +85,10 @@ read                {if(mydebug)
                         fprintf(stderr,"ID: %s\n",yytext);
                       yylval.string=strdup(yytext);
                       return ID; }
+
+\"([^\\\"]|\\.)*\" {
+                    yylval.string=strdup(yytext);
+                    return STRINGTEXT;}
 
 [ \t]               {/*Eats whitespace*/}
 

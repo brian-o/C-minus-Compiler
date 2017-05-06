@@ -44,6 +44,12 @@ main:
 	lw  $a0, ($t2)		 #put id value in a0
 	li  $v0, 1		 #put 1 in v0 to print an integer
 	syscall		
+	.data		
+_t2: .asciiz  "\nHello\n\n World"			
+	.text		
+	la  $a0, _t2		#Load address of the string
+	li  $v0, 4		#Load 4 to print a string
+	syscall		
 	li $v0, 0		#Return 0 since there was no expression
 	lw  $ra, 4($sp)		# Load the right value back into ra
 	lw  $sp, ($sp)		#add the right value back into sp

@@ -605,25 +605,38 @@ void emitAST(ASTnode* p)
                 case NUMBER:
 		        sprintf(s,"li  $a0, %d",p->right->value);
 		        emit(fp, "",s,"# Write a Number to the screen");
+                emit(fp,"","li  $v0, 1"," #put 1 in v0 to print an integer");
 		        break;
 
                 case EXPR:
 		        emitAST(p->right);
                 sprintf(s, "lw  $a0, %d($sp)",p->right->symbol->offset*WORDSIZE);
 		        emit(fp, "",s," #fetch expr value");
+                emit(fp,"","li  $v0, 1"," #put 1 in v0 to print an integer");
 		        break;
 
 	            case CALLSTMT:
                 emit_callstmt(p->right);
                 emit(fp,"","addu $a0, $v0, 0","#put the return in a0 to write");
+                emit(fp,"","li  $v0, 1"," #put 1 in v0 to print an integer");
 		        break;
 
                 case IDENT:
 		        emit_ident(p->right);
 		        emit(fp, "","lw  $a0, ($t2)"," #put id value in a0");
+                emit(fp,"","li  $v0, 1"," #put 1 in v0 to print an integer");
 		        break;
+
+                case STRINGNODE:
+                emit(fp,"",".data","");
+                sprintf(s,"%s: .asciiz  %s",p->right->name, p->right->str);
+                emit(fp,s,"","");
+                emit(fp,"",".text","");
+                sprintf(s,"la  $a0, %s",p->right->name);
+                emit(fp,"",s,"#Load address of the string");
+                emit(fp,"","li  $v0, 4","#Load 4 to print a string");
+                break;
 	        }
-            emit(fp,"","li  $v0, 1"," #put 1 in v0 to print an integer");
             emit(fp,"","syscall","");
             break;
 

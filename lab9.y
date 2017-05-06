@@ -49,9 +49,9 @@ void yyerror (s)  /* Called by yyparse on error */
 %left '*' '/' '%'
 %left UMINUS
 
-%token IF WHILE ELSE RETURN GE LE EQ NE READ WRITE INT VOID
+%token IF WHILE ELSE RETURN GE LE EQ NE READ WRITE INT VOID STRING
 %token <value> NUM
-%token <string> ID
+%token <string> ID STRINGTEXT
 %type <node> declarationList decl varDecl funDecl params
 %type <node> paramList param compoundStmt localDecls stmtList stmt expStmt
 %type <node> selectStmt iterStmt returnStmt readStmt writeStmt expression
@@ -142,6 +142,7 @@ varDecl         : typeSpec ID ';'
 
 typeSpec        : INT   { $$=INTDEC;}
                 | VOID  { $$=VOIDDEC;}
+                | STRING{ $$=STRINGDEC;}
                 ;
 
 funDecl         : typeSpec ID '('
@@ -403,7 +404,7 @@ expStmt         : expression ';'
                     $$=ASTCreateNode(EXPRSTMT);
                     $$->right=$1;
                     $$->isType=$1->isType;
-                    
+
 
                     if (debug){
                         fprintf(stderr, "Finished creating an expression Statement");
@@ -656,6 +657,13 @@ factor          : '(' expression ')' {$$ = $2;}
                 }
                 | var  {$$ = $1;}
                 | call {$$ = $1;}
+                | STRINGTEXT
+                {
+                    $$=ASTCreateNode(STRINGNODE);
+                    $$->name = CreateTemp();
+                    $$->isType=STRINGDEC;
+                    $$->str = $1;
+                }
                 ;
 
 call            : ID '(' args ')'

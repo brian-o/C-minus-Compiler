@@ -58,8 +58,10 @@ extern int yydebug;
     WRITE = 268,
     INT = 269,
     VOID = 270,
-    NUM = 271,
-    ID = 272
+    STRING = 271,
+    NUM = 272,
+    ID = 273,
+    STRINGTEXT = 274
   };
 #endif
 /* Tokens.  */
@@ -76,8 +78,10 @@ extern int yydebug;
 #define WRITE 268
 #define INT 269
 #define VOID 270
-#define NUM 271
-#define ID 272
+#define STRING 271
+#define NUM 272
+#define ID 273
+#define STRINGTEXT 274
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
@@ -91,7 +95,7 @@ union YYSTYPE
     ASTnode * node;  /* so we can build an AST */
     enum OPERATORS op;
 
-#line 95 "y.tab.h" /* yacc.c:1909  */
+#line 99 "y.tab.h" /* yacc.c:1909  */
 };
 
 typedef union YYSTYPE YYSTYPE;

@@ -183,8 +183,9 @@ funDecl         : typeSpec ID '('
                     level = 0;
                     $$->value=maxoffset;
                     //we change this in the symbol table because it is not used
-                    //anywhere else. We have access to this in calls, so we can
-                    //use it to determine where the stack pointer is going to have to be
+                    //anywhere else for functions. We have access to this
+                    //in calls, so we can use it to determine where the
+                    //stack pointer is going to have to be
                     $$->symbol->mysize = maxoffset;
                     /*change the offset back to the global offset*/
                     offset=goffset;
@@ -285,15 +286,19 @@ compoundStmt    : '{' { level++; }
                         ASTattachleft($3,$4);
                         $$->right=$3;
                    }
-                   fprintf(stderr,"\ntable before deleting");
-                   Display();/*Display before*/
+                   if(debug) {
+                       fprintf(stderr,"\ntable before deleting");
+                       Display();/*Display before*/
+                   }
                    /*delete the old symbols from this block so they can
                    be used in a different block later on*/
                    offset -=Delete(level);
                    level--;
-                   fprintf(stderr,"\nEnd of compoundStmt, deleting symbols");
-                   fprintf(stderr,"     current table...");
-                   Display();/*Display after*/
+                   if (debug) {
+                       fprintf(stderr,"\nEnd of compoundStmt, deleting symbols");
+                       fprintf(stderr,"     current table...");
+                       Display();/*Display after*/
+                   }
 
                 }
                 ;
@@ -709,6 +714,7 @@ argList         : expression
                 {
                     $$=ASTCreateNode(ARGLIST);
                     $$->right=$1;
+
                 }
                 | expression ',' argList
                 {  /*attach the expressions to the tree in order
@@ -731,6 +737,7 @@ int main(int argc, char const *argv[]) {
         char * v1 = "-v";
         char * v2 = "--verbose";
         char * v3 = "-o";
+        char * v4 = "-s";
         if(strcmp(test,v1)==0 || strcmp(test,v2)==0)
             debug=1;
         if(strcmp(test,v3)==0)
@@ -744,10 +751,19 @@ int main(int argc, char const *argv[]) {
             if (fp==NULL)
             {
                 fprintf(stderr,"Cannot open %s\n",f);
+                fprintf(stderr,"It may not exist in this directory\n");
                 exit(1);
             }
         }//end if -o set
     }//end loop
+    if(fp==NULL){
+        fprintf(stderr,"No file selected, emitting to a.out\n");
+        fp = fopen("a.out","w");
+    }
+    if(fp==NULL){
+        fprintf(stderr,"Couldn't emit to a.out, try using a file name\n");
+        fprintf(stderr,"if this error persists\n");
+    }
     yyparse();
     /*fprintf(stderr,"\nMain symbol table");
     Display();
@@ -756,7 +772,7 @@ int main(int argc, char const *argv[]) {
     */
     //ASTprint(0,prog);  /* this is where we can do things with the AST like
                         //print it or process it */;
-    printf("\n\n");
     emitAST(prog);
+    fprintf(stderr,"Finished Emitting Successfully\n");
     return(0);
 }

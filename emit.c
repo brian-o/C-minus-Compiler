@@ -1,4 +1,49 @@
+/*************************************************************
+    emit.c
+    Written by: Brian O'Dell  April, 2017
+    This file along with it's header is a collection of functions
+    adapted from ASTprinting. It is meant to take a valid Abstract
+    Syntax Tree (AST) and generate mips assembly code from it.
 
+    This program will give mips based on the AST. Therefore, if the
+    AST was not made properly the code my not work as expected.
+    There is not a check to see that the tree is correct.
+
+    It should be noted that mips "pseudo instructions" were used
+    when deemed appropriate. Mainly, it the case of determining
+    equal/not equal in expressions. This was done for ease
+    of programming alone, it should have no effect on runtime.
+
+    The main driver of the program is emitAST, it is located at
+    the bottom of the file.
+
+    Preconditions:
+        1.) It is assumed that the program is passed a valid AST.
+            It only handles the AST format that was developed in
+            conjunction with this emitter. If different variable names,
+            pointers, etc are used there will be segmentation faults.
+        2.) It is assumed that the AST files will be included in
+            any file/ program that calls these functions. They are
+            not included here to prevent re-declaring structs, etc.
+        3.) It is assumed that FILE * fp is handled before calling
+            these functions, and that it points to a valid output.
+            It has been tested to work on files and stdout.
+        4.) It is assumed this will be run on linux systems, other
+            operating systems, including other UNIX based systems,
+            have not been tested. Therefore, they are not guaranteed
+            to work properly.
+        5.) There must be a "main" function in the AST, or the output
+            may not be runnable on simulators or machines.
+
+    Postconditions:
+        1.) Mips code will be emitted to the location FILE * fp
+            points to when the program is run.
+        2.) Said mips code will be in standard format, i.e.
+            LABEL  COMMAND  COMMENT
+        3.) The mips code will execute the functions descibed
+            by the AST.
+
+*************************************************************/
 
 #include "emit.h"
 #include <stdlib.h>
@@ -7,6 +52,9 @@ static int LTEMP=0;
 
 /**
   * Helper function to generate labels for jumps
+  * After execution the return will be a label such as _L3
+  * The label will be unique, in that it can not be one the user
+  * could make, and will be the next one in numeric sequence
   */
 char * genLabel()
 {
@@ -18,9 +66,13 @@ char * genLabel()
 }
 
 /**
- * Helper function to emit a line to a file, accepts:
- * a file pointer, a label, a command, and a comment
- * will use stdout for now instead of fp
+  * Helper function to emit a line to a file, accepts:
+  * a file pointer, a label, a command, and a comment
+  * Preconditions:
+  *     1.) All args are not NULL
+  *     2.) char x, is not used anywhere else, to prevent overwrites
+  * Postconditions:
+        1.) The line with all the data will be output to fp
  */
 void emit(FILE * fp, char * label, char * cmd, char * comment)
 {
@@ -29,12 +81,26 @@ void emit(FILE * fp, char * label, char * cmd, char * comment)
     fprintf(fp,"%s",x);
 }
 
-//function to emit edentifier code so that t2 is the direct
-//access into memory for the identifier
+/**
+  * Helper function to emit identifiers, goal is to have t2 be the
+  * correct location in memory for said identifier.
+  * Preconditions:
+  *     1.) p must be an IDENT node
+  *     2.) If p is an array the things allowed inside  brackets are only
+  *         Numbers, Expressions, Identifiers, Function calls.
+  *         Other things will not work correctly.
+  *     3.) The identifier was already declared in the symbol table,
+  *         If this is not handled elsewhere correctly, there will
+  *         segmentation faults
+  * Postconditions:
+  *     1.) Recursive calls will be used to emit things other than Numbers
+  *         in array brackets
+  *     2.) $t2 will be the exact memory location of the desired variable
+ */
 void emit_ident(ASTnode * p)
 {   //check to see if it is a global
     if(p->symbol->level==0)
-    {
+    {   //if NULL it is scalar
         if (p->right == NULL)
         {
             sprintf(s,"la  $t2, %s",p->name);
@@ -78,15 +144,15 @@ void emit_ident(ASTnode * p)
                 emit(fp,"","add $t2, $t2, $t3","#Add array offset to ID address");
                 break;
 
-		        case CALLSTMT:
-		        emit_callstmt(p->right);
-		        emit(fp,"","addu $t3, $v0, 0","#Move return value into t3");
-		        sprintf(s,"sll $t3, $t3, %d",WORDSIZE/2);
+                case CALLSTMT:
+                emit_callstmt(p->right);
+                emit(fp,"","addu $t3, $v0, 0","#Move return value into t3");
+                sprintf(s,"sll $t3, $t3, %d",WORDSIZE/2);
                 emit(fp,"",s,"#Mutliply array offset by WORDSIZE");
                 sprintf(s,"la  $t2, %s",p->name);
                 emit(fp,"",s,"#Get ID address from data segment");
                 emit(fp,"","add $t2, $t2, $t3","#Add array offset to ID address");
-		        break;
+                break;
             }//end switch
         }//end else is an array
     }//end ifis a global
@@ -142,10 +208,10 @@ void emit_ident(ASTnode * p)
                 emit(fp,"","add $t2, $t2, $sp","#Add the stack poitner in");
                 break;
 
-		        case CALLSTMT:
-		        emit_callstmt(p->right);
-		        emit(fp,"","addu $t3, $v0, 0","#Move return value into t3");
-		        sprintf(s,"sll $t3, $t3, %d",WORDSIZE/2);
+                case CALLSTMT:
+                emit_callstmt(p->right);
+                emit(fp,"","addu $t3, $v0, 0","#Move return value into t3");
+                sprintf(s,"sll $t3, $t3, %d",WORDSIZE/2);
                 emit(fp,"",s,"#Mutliply array offset by WORDSIZE");
                 sprintf(s,"li  $t2, %d",p->symbol->offset*WORDSIZE);
                 emit(fp,"",s,"#Load initial offset for the ID");
@@ -161,8 +227,19 @@ void emit_ident(ASTnode * p)
 
 
 /**
+  * Helper function that will emit the code for expressions
   * The goal is to have the value of the evaluated expression in its
   * place in the stack, to use it later
+  * Preconditions:
+  *     1.) p must be a valid EXPR node
+  *     2.) The left hand side(LHS) and right hand side(RHS) can only be
+  *         Numbers, Identifiers, other expressions, and function calls.
+  *         Other things will not work correctly
+  *     3.) The expression has an enrty in the symbol table,
+  *         even if temporary
+  * Postconditions:
+  *     1.) The value of the evaluated expression will be in the correct
+  *         location in the stack, found by its offset in the symbol table
  */
 void emit_expr(ASTnode * p)
 {
@@ -184,11 +261,11 @@ void emit_expr(ASTnode * p)
         emit(fp,"",s,"#Insert the value from the LHS EXPR into t0");
         break;
 
-	    case CALLSTMT:
-	    emit_callstmt(p->left);
-	    //v0 has what we need move it into t0
-	    emit(fp,"","addu $t0, $v0, 0","#Get return for LHS");
-	    break;
+        case CALLSTMT:
+        emit_callstmt(p->left);
+        //v0 has what we need move it into t0
+        emit(fp,"","addu $t0, $v0, 0","#Get return for LHS");
+        break;
 
         default:
         fprintf(stderr,"unhandled type in emit_expr");
@@ -215,11 +292,11 @@ void emit_expr(ASTnode * p)
         emit(fp,"",s,"#Insert the value from the RHS EXPR into t1");
         break;
 
-	    case CALLSTMT:
-	    emit_callstmt(p->right);
-	    //v0 has what we need move it into t0
-	    emit(fp,"","addu $t1, $v0, 0","#Get return for RHS");
-	    break;
+        case CALLSTMT:
+        emit_callstmt(p->right);
+        //v0 has what we need move it into t0
+        emit(fp,"","addu $t1, $v0, 0","#Get return for RHS");
+        break;
 
         default:
         fprintf(stderr,"unhandled type in emit_expr");
@@ -230,6 +307,7 @@ void emit_expr(ASTnode * p)
     sprintf(s,"lw  $t0, %d($sp)",p->symbol->offset*WORDSIZE);
     emit(fp,"",s,"#Get what was in t0 back form the stack");
 
+    //evaluate the expression properly using t0 and t1
     switch (p->op) {
         case PLUS:
         emit(fp,"","add $t0, $t0, $t1","#add the LHS and RHS");
@@ -281,8 +359,25 @@ void emit_expr(ASTnode * p)
 }//end emit_expr
 
 
-
-
+/**
+  * Helper function to emit iterative stmts, specifially while statements
+  * Preconditions:
+  *     1.) p is a valid ITERSTMT node, it has a p->right, and a p->s1
+  *     2.) p->right can only be a Number, Identifier, Expression,
+  *         or function call. Others will not work
+  *     3.) s1 should be some kind of statment or block statement
+  * Postconditions:
+  *     1.) temporary labels will be emitted, based on the form
+  *         provided by the genLabel function
+  *     2.) The expression in p->right will emitted recursively
+  *         and be evaluated in mips
+  *     3.) If the expression is false, the loop will stop by jumping out
+  *     4.) If the expression is true, the statments that were emitted
+  *         recursively by the program will execute. After each iteration
+  *         the expression will be re-evaluated.
+  *     5.) Everything needed to emit the loops will be done after execution
+  *         of this helper function.
+ */
 void emit_iteration(ASTnode * p)
 {
     char * L3;
@@ -308,19 +403,19 @@ void emit_iteration(ASTnode * p)
 
         case IDENT:
         emit_ident(p->right);
-        emit(fp,"","lw  $t0, ($t2)", "#Load the value from the stack int t0 for while");
+        emit(fp,"","lw  $t0, ($t2)", "#Load value from stack in t0 for while");
         break;
 
         case CALLSTMT:
         emit_callstmt(p->right);
-        emit(fp,"","lw  $t0, ($v0)","#Load value from the return for whilestmt");
+        emit(fp,"","lw  $t0, ($v0)","#Load value from return for whilestmt");
         break;
     }
     //condition no satisfied jump out
     sprintf(s,"beq $t0 $0 %s",L4);
     emit(fp,"",s,"#WHILE expression false jump out");
 
-    //recursively emit Statement(can be block) and jump over else stmts
+    //recursively emit Statement(can be block)
     emitAST(p->s1);
     sprintf(s,"j   %s", L3);
     emit(fp,"",s,"#jump back to beginning of WHILE");
@@ -331,8 +426,27 @@ void emit_iteration(ASTnode * p)
 }//end emit_iteration
 
 
-
-
+/**
+  * Helper function to emit if statements
+  * Preconditions:
+  *     1.) p must be a valid IFSTMT node, it has a p->right,
+  *         a p->s1, and an optional p->s2 for ELSE
+  *     2.) p->right can only be a Number, Identifier, expression
+  *         or function call. Others will not work correctly
+  *     3.) p->s1 and p->s2(if it exists) should be some
+  *         kind of statement or block statment
+  * Postconditions:
+  *     1.) temporary labels will be emitted based on the form from genLabel
+  *     2.) The expression in p->right will be emitted recursively,
+  *         it will be evaluated in mips to check the branch
+  *     3.) If the expression was true, the statment/s in s1 will be executed
+  *     4.) If the expression was false, the statment/s in s2 will
+  *         be executed, if no else was declared only the label is made.
+  *     5.) s1 and s2 statment/s will be emitted recursively
+  *         and be in the proper place
+  *     6.) All things needed for the IFSTMT will be complete
+  *         after this function executes
+ */
 void emit_ifstmt(ASTnode * p)
 {
     char * L1;
@@ -354,10 +468,11 @@ void emit_ifstmt(ASTnode * p)
 
         case IDENT:
         emit_ident(p->right);
-        emit(fp,"","lw  $t0, ($t2)", "#Load the value from the stack into t0 for ifstmt");
+        emit(fp,"","lw  $t0, ($t2)", "#Load value from stack in t0 for ifstmt");
         break;
 
         case CALLSTMT:
+        emit_callstmt(p->right);
         emit(fp,"","addu $t0, $v0, 0","#get value from return into t0");
         break;
     }
@@ -382,70 +497,130 @@ void emit_ifstmt(ASTnode * p)
     emit(fp,s,"","# End of IF");
 }//end emit_ifstmt
 
-
-//we were handed p->right, an arg node
-//this function isnt called if args are void
-//from here p->right is the arg's expression
-//p->left is the next arg in the list
-//p->right should not be NULL so we will not check
-void emit_args(ASTnode * p, int argNum)
+/**
+  * Helper function to emit a list of function call args
+  * Unfortunately, there must be repeated code for the cases in the switch
+  * statement. This is because function calls must work differently
+  * in order to work correctly alongside other things like recursion.
+  * Preconditions:
+  *     1.) p is a valid ARG node, it has a p->right, it may have p->left
+  *     2.) p->right is the expression in the arg,
+  *         p->left is the next arg in the list if it exists
+  *     3.) p->right can never be NULL, and must be a Number, Identifier,
+  *         expression or function call. Others will not work
+  *     4.) argNum must be passed correctly so it is saved in the stack
+  *     5.) offsetDownFromSP is the maxoffset of the function being called
+  *     6.) this function isn't called if args are void
+  * Postconditions:
+  *     1.) After one exectution the value of the arg will be in the
+  *         slot of the stack they belong when the funciton is called.
+  *         In other words it will be:
+  *         SP - offsetDownFromSP + (argNum+1)*WORDSIZE
+  *     2.) It is recursive, so if there is another arg in the list
+  *         the function will run again until all args are done
+  *     3.) After this function finishes completely, all the args for a
+  *         function call will be emitted and stored in their future locations
+ */
+void emit_args(ASTnode * p, int argNum, int offsetDownFromSP)
 {
     switch(p->right->type)
     {
         case NUMBER:
         sprintf(s,"li  $t0, %d",p->right->value);
         emit(fp,"",s," #Load imeddiate into t0 for arg");
+        //move the sp temporarily
+        sprintf(s,"subu $t6, $sp, %d",offsetDownFromSP);
+        emit(fp,"",s,"# put where the new sp should be in t0");
+        emit(fp,"","sw  $sp, ($t6)","# save the old sp");
+        emit(fp,"","addu $sp, $t6, 0","#move the sp now");
+
+        //store the value and move sp back
+        sprintf(s,"sw  $t0 %d($sp)",(argNum+1)*WORDSIZE);
+        emit(fp,"",s,"#store the value of arg into the stack");
+        emit(fp,"","lw  $sp, ($sp)","#Put sp back where it goes");
         break;
 
         case IDENT:
-        //emit(fp,"","addu $t7, $sp, 0","# put the old sp in t7");
-        //sprintf(s,"addu $sp, $sp, %d",offsetDownFromSP);
-        //emit(fp,"",s,"#move sp up temporarily");
         emit_ident(p->right);
         emit(fp,"","lw  $t0, ($t2)"," #arg is an ID load into t0");
-        //sprintf(s,"subu $sp, $sp, %d",offsetDownFromSP);
-       // emit(fp,"",s,"#move sp back where it goes");
+        //move the sp temporarily
+        sprintf(s,"subu $t6, $sp, %d",offsetDownFromSP);
+        emit(fp,"",s,"# put where the new sp should be in t0");
+        emit(fp,"","sw  $sp, ($t6)","# save the old sp");
+        emit(fp,"","addu $sp, $t6, 0","#move the sp now");
+
+        //store the value and move sp back
+        sprintf(s,"sw  $t0 %d($sp)",(argNum+1)*WORDSIZE);
+        emit(fp,"",s,"#store the value of arg into the stack");
+        emit(fp,"","lw  $sp, ($sp)","#Put sp back where it goes");
         break;
 
         case EXPR:
         emit_expr(p->right);
         sprintf(s,"lw  $t0, %d($sp)",p->right->symbol->offset*WORDSIZE);
         emit(fp,"",s,"#Insert the value from the arg expr into t0");
+        //move the sp temporarily
+        sprintf(s,"subu $t6, $sp, %d",offsetDownFromSP);
+        emit(fp,"",s,"# put where the new sp should be in t0");
+        emit(fp,"","sw  $sp, ($t6)","# save the old sp");
+        emit(fp,"","addu $sp, $t6, 0","#move the sp now");
+
+        //store the value and move sp back
+        sprintf(s,"sw  $t0 %d($sp)",(argNum+1)*WORDSIZE);
+        emit(fp,"",s,"#store the value of arg into the stack");
+        emit(fp,"","lw  $sp, ($sp)","#Put sp back where it goes");
         break;
 
         case CALLSTMT:
+        //move the sp temporarily
+        sprintf(s,"subu $t6, $sp, %d",offsetDownFromSP);
+        emit(fp,"",s,"# put where the new sp should be in t0");
+        emit(fp,"","sw  $sp, ($t6)","# save the old sp");
+        emit(fp,"","addu $sp, $t6, 0","#move the sp now");
+
         emit_callstmt(p->right);
-        //v0 has what we need move it into t0
-        emit(fp,"","addu $t0, $v0, 0","#Get return for arg into t0");
+
+        //store the value and move sp back
+        sprintf(s,"sw  $v0 %d($sp)",(argNum+1)*WORDSIZE);
+        emit(fp,"",s,"#store the value of arg into the stack");
+        emit(fp,"","lw  $sp, ($sp)","#Put sp back where it goes");
         break;
 
         default:
         fprintf(stderr,"unhandled type in emit_expr");
         exit(1);
     }//end switch for arg type
-    sprintf(s,"subu $t6, $sp, %d",offsetDownFromSP);
-    emit(fp,"",s,"# put where the new sp should be in t0");
-    emit(fp,"","sw  $sp, ($t6)","# save the old sp");
-    emit(fp,"","addu $sp, $t6, 0","#move the sp now");
-    
-    
-    sprintf(s,"sw  $t0 %d($sp)",(argNum+1)*WORDSIZE);
-    emit(fp,"",s,"#store the value of arg into the stack");
-    emit(fp,"","lw  $sp, ($sp)","#Put sp back where it goes");
 
+    //if we have more to do, recursively do the next arg
     if(p->left != NULL)
-        emit_args(p->left,argNum +1);
+        emit_args(p->left,argNum +1,offsetDownFromSP);
 }//end emit_args
 
 
-
+/**
+  * Helper function to emit return statements, it is also called
+  * at the end of every funciton declaration to ensure default returns
+  * Preconditions:
+  *     1.) p is a valid RETURNSTMT node
+  *     2.) if there is an expression/value to return it must be in p->s2
+  *     3.) p->s2 can only be a number, expression, Identifier
+  *         or function call, others will not work
+  * Postconditions:
+  *     1.) return expression will be executed if it exits,
+  *         and the value will be in v0
+  *     2.) the return address and correct stack pointer will be
+  *         set and then we will jump to the value in the return address
+  *     3.) If this was called without an expression p->s2 will be null,
+  *         this is true when a function declaration called
+  *         this method. In these two cases 0 is returned in v0
+ */
 //when this is call we will have the return stmt in p
 void emit_return_stmt(ASTnode * p)
 {
     //there is an expression to do if something is in p->s2
     if(p->s2 != NULL)
     {
-	    switch (p->s2->type)
+        switch (p->s2->type)
         {
             case NUMBER:
             sprintf(s,"li $v0, %d",p->s2->value);
@@ -455,23 +630,24 @@ void emit_return_stmt(ASTnode * p)
             case EXPR:
             emitAST(p->s2);
             sprintf(s,"lw  $v0, %d($sp)",p->s2->symbol->offset*WORDSIZE);
-            emit(fp,"",s,"#load the value from the stack into v0 for return");
+            emit(fp,"",s,"#load value from stack into v0 for return");
             break;
 
             case IDENT:
             emit_ident(p->s2);
-            emit(fp,"","lw  $v0, ($t2)", "#Load the value from the stack into v0 for return");
+            emit(fp,"","lw  $v0, ($t2)","#Load value from stack in v0 for return");
             break;
 
             case CALLSTMT:
-		    emitAST(p->s2);
+            emitAST(p->s2);
+            //v0 already has our value nothing left to do
             break;
 
         }//end switch for expr type
     }//end if expr exists
-    //the else means there was just "return;""
+    //the else means there was just "return;"
     else
-	    emit(fp,"","li $v0, 0","#Return 0 since there was no expression");
+        emit(fp,"","li $v0, 0","#Return 0 as default");
 
     sprintf(s,"lw  $ra, %d($sp)",1*WORDSIZE);
     emit(fp,"",s,"# Load the right value back into ra");
@@ -480,61 +656,247 @@ void emit_return_stmt(ASTnode * p)
 }//end emit_return_stmt
 
 
-
+/**
+  * Helper function to emit call statements
+  * Preconditions:
+  *     1.) p must be a valid CALLSTMT node
+  *     2.) p->name must be the name that of the function
+  *         that is trying to be called in this node
+  *     3.) p->symbol->mysize should be set to the function's
+  *         maxoffset when the AST is being made, this is so
+  *         we can properly temporarily move the sp the evaluate the args.
+  *         If it is a void function this is ignored
+  *     4.) If args exist they must be in p->right. They must be valid ARG
+  *         nodes and linked where ARG->right is the expression in the arg,
+  *         and ARG->left is the next arg if it exists
+  * Postconditions:
+  *     1.) Args will be handled by another function if they exist,
+  *         this will happen before the call.
+  *     2.) offsetDownFromSP will be the same as the function's maxoffset
+  *     3.) The jump will be emitted, and a nop will be after.
+  *         The program counter will be at the address of the
+  *         nop after returning from the jump
+ */
 void emit_callstmt(ASTnode * p)
 {
     if(p->right != NULL)
     {
-        //p->right is beginning of arglist
-        //each arg expression is in p->right
-        //the next arg in the list is p->left
-        //if p->left is NULL we are al the end of the list.
-        //this value is the same as maxoffset for the function
-        //made this way when creating the AST
-        //only used forclarity of what operations are happening
+        //offsetDownFromSP is the same as the function's maxoffset
+        int offsetDownFromSP;
         offsetDownFromSP = p->symbol->mysize*WORDSIZE;
-       
-        //$t5 is now the old sp we will evaluate all the expressions
-        //in the args and put the values in the right memory addressess
-         //p->right is beginning of arglist
-        //each arg expression is in p->right
-        //the next arg in the list is p->left
-        //if p->left is NULL we are al the end of the list.
-        //no we can emit the args, using $t5 as our "sp"
-        emit_args(p->right,1);
-       
+        emit_args(p->right,1,offsetDownFromSP);
     }//end if there are args
 
+    //do the jump, the nop is just in case weird things happen
+    //this is because PC will be here when we return
+    //if an instruction was in this slot potential problems could happen
     sprintf(s,"jal %s",p->name);
     emit(fp,"",s,"#jump and linkthe function");
     emit(fp,"","nop","#Program counter will be here when we return");
 }//end emit_callstmt
 
 
+/**
+  * Helper function to emit assignmet statements
+  * Preconditions:
+  *     1.) p must be a valid ASSIGN node, and must have a symbol table entry
+  *         This should be created when the AST is made
+  *     2.) p must have a p->s1, and p->right
+  *     3.) p->s1 should be type EXPRSTMT, p->right should be type IDENT
+  *     4.) The function that handles EXPRSTMT must put the value in $t6
+  *     5.) The function that handles IDENT must put the address
+  *         of the ident in $t2
+  * Postconditions:
+  *     1.) All the mips code needed will be emitted to
+  *         execute Postcondition 2.
+  *     2.) The value of the expression will be inserted into the stack
+  *         at the location where the variable is
+ */
 void emit_assignment_stmt(ASTnode * p)
 {
     //right = var, s1 = expression
     //Emit the expressionstmt, value will be in t6
     //but we want to save it so it wont get overwritten
     emitAST(p->s1);
-	sprintf(s,"sw $t6, %d($sp)",p->symbol->offset*WORDSIZE);
-	emit(fp,"",s,"#put the value in the write place for later");
+    sprintf(s,"sw $t6, %d($sp)",p->symbol->offset*WORDSIZE);
+    emit(fp,"",s,"#put the value in the right place for later");
 
     //Emit the ID, address will be in t2 we do this after the expression
     //Because emit_ident does not touch t0
     emit_ident(p->right);
     //First get value off the stack into t6
     //Now shove value in t6 into address at t2
-	sprintf(s,"lw $t6, %d($sp)",p->symbol->offset*WORDSIZE);
+    sprintf(s,"lw $t6, %d($sp)",p->symbol->offset*WORDSIZE);
     emit(fp,"",s,"#sget the value back formt he stack");
     emit(fp,"","sw  $t6, ($t2)","#Store the value in the right place");
 }//emit_assignment_stmt
+
+
+/**
+  * Helper function to emit write statements, whatever is denoted will
+  * appear on the console when the code is run
+  * Preconditions:
+  *     1.) p must be a valid WRITESTMT node
+  *     2.) p->right must not be NULL, and can only be a Number, expression
+  *         Identifier, function call, or a string literal
+  *     3.) All Previously necessary actions must be properly done in
+  *         the lex, yacc, and AST for this to work properly
+  * Postconditions:
+  *     1.) The appropriate actions will be emitted for p->right
+  *     2.) a syscall will be emitted
+  *     3.) when run the code will display the right thing in the console
+  *
+ */
+void emit_write_stmt(ASTnode * p)
+{
+    switch (p->right->type) {
+        case NUMBER:
+        sprintf(s,"li  $a0, %d",p->right->value);
+        emit(fp, "",s,"# Write a Number to the screen");
+        emit(fp,"","li  $v0, 1"," #put 1 in v0 to print an integer");
+        break;
+
+        case EXPR:
+        emitAST(p->right);
+        sprintf(s, "lw  $a0, %d($sp)",p->right->symbol->offset*WORDSIZE);
+        emit(fp, "",s," #fetch expr value");
+        emit(fp,"","li  $v0, 1"," #put 1 in v0 to print an integer");
+        break;
+
+        case CALLSTMT:
+        emit_callstmt(p->right);
+        emit(fp,"","addu $a0, $v0, 0","#put the return in a0 to write");
+        emit(fp,"","li  $v0, 1"," #put 1 in v0 to print an integer");
+        break;
+
+        case IDENT:
+        emit_ident(p->right);
+        emit(fp, "","lw  $a0, ($t2)"," #put id value in a0");
+        emit(fp,"","li  $v0, 1"," #put 1 in v0 to print an integer");
+        break;
+
+        case STRINGNODE:
+        emit(fp,"",".data","");
+        sprintf(s,"%s: .asciiz  %s",p->right->name, p->right->str);
+        emit(fp,s,"","");
+        emit(fp,"",".text","");
+        sprintf(s,"la  $a0, %s",p->right->name);
+        emit(fp,"",s,"#Load address of the string");
+        emit(fp,"","li  $v0, 4","#Load 4 to print a string");
+        break;
+    }
+    emit(fp,"","syscall","");
+}
+
+
+/**
+  * Helper function to emit expression statements, these are not the same
+  * as an expression. In the grammar they are denoted by -> expression ';'
+  * They usually occur in assignment statements, and function calls that
+  * are alone on a line i.e. foo();
+  * Preconditions:
+  *     1.) p must be a valid EXPRSTMT node, and have a p->right
+  *     2.) p->right can not be NULL, and must be only a Number, expression
+  *         Identifier, or a function call.
+  * Postconditions:
+  *     1.) The value of the expression will be put into $t6 to use later
+ */
+void emit_expression_stmt(ASTnode * p)
+{
+    //do the right hand pointer in this node
+    //can be NUMBER, EXPR, CALL, or VAR, we need the value to be
+    //in t6 when we are done.
+    switch (p->right->type) {
+        case NUMBER:
+        sprintf(s,"li  $t6, %d",p->right->value);
+        emit(fp,"",s,"#Load number into $t6 for expr stmt");
+        break;
+
+        case EXPR:
+        emitAST(p->right);
+        sprintf(s,"lw  $t6, %d($sp)",p->right->symbol->offset*WORDSIZE);
+        emit(fp,"",s,"#load the value from the stack into t6");
+        break;
+
+        case IDENT:
+        emit_ident(p->right);
+        emit(fp,"","lw  $t6, ($t2)", "#Load value from stack in t6 for exprstmt");
+        break;
+
+        case CALLSTMT:
+        emit_callstmt(p->right);
+        emit(fp,"","addu $t6, $v0, 0","#put the return in t6 to use later");
+        break;
+
+    }
+}//end emit_expression_stmt
+
+
+/**
+  * Helper function to emit funciton declarations. The function will have
+  * everything needed to run when we are done.
+  * Preconditions:
+  *     1.) p must be a valid FUNCTIONDEC node, it must have p->right
+  *     2.) p->right must be the block statement, which are the
+  *         statments the function should do when called
+  *     3.) p->name must be the name of the function and not repeated anywhere
+  *     4.) p->value must be the maxoffset required for the function
+  * Postconditions:
+  *     1.) The function name will be emitted in the .text segment
+  *     2.) The old SP, and RA will be saved in 0(newSP) and 4(newSP) respectively
+  *     3.) The sp will then be moved to the new place
+  *     4.) All statments inside the block statment will be handled by the
+  *         main driver of this program recursively
+  *     5.) A generic return of 0 will be made by calling emit_return_stmt
+  *         If another return is used explicitly this will never be reached
+ */
+void emit_fundec(ASTnode * p)
+{
+    //declare function as global
+    emit(fp,".text","     \t\t","# Directive that says we are in code segment");
+    sprintf(s,".globl %s",p->name);
+    emit(fp,"",s,"#global declaration of function");
+    //insert the label for the function
+    sprintf(s,"%s:",p->name);
+    emit(fp,s,"","");
+
+    //make the activation record
+    //stackval = p->value*WORDSIZE;
+    sprintf(s,"subu $t0, $sp, %d",p->value*WORDSIZE);
+    emit(fp,"",s,"# put where the new sp should be in t0");
+    sprintf(s,"sw  $ra, %d($t0)",1*WORDSIZE);
+    emit(fp,"",s,"# Store return adress into the stack");
+    emit(fp,"","sw  $sp, ($t0)","# save the old sp");
+    emit(fp,"","addu $sp, $t0, 0","#move the sp now");
+
+    //recursively do the block inside the dec
+    emitAST(p->right);
+    //we do the return stmt no matter what, if there is
+    //a declared return this block doesn't get executed in asm
+    emit_return_stmt(p);
+}//end emit_fundec
 
 
 /******************************************************************
 *
 * start of emitAST
 *
+* Main driver for emission of and Abstract Syntax Tree.
+* Preconditions:
+*   1.) p must be a valid node type in ENUM type of the AST
+*   2.) only the types that are need by this driver ever reach this function.
+*       Any unhandled types should never get here, and there is an error in
+*       the AST if that error occurs
+*   3.) p must have a type in p->type
+*   4.) Overall program Preconditions must be true, and all preconditions
+*       of helper function must be true for this to work as intended
+* Postconditions:
+*   1.) if p is NULL the function will simply return
+*   2.) After this is called from a "program" AST node all the mips code
+*       for the program will be emitted.
+*   3.) The driver will handle emission of the current node, and will be
+*       recursively called to hanlde everything below it on the tree. The next
+*       node in the tree is at p->left in every case, but expressions
 *******************************************************************/
 /*  Emit the mips code to the file */
 void emitAST(ASTnode* p)
@@ -552,38 +914,16 @@ void emitAST(ASTnode* p)
             }
             break;
 
-        //right is block, s1 is params
         case FUNCTIONDEC:
-            //declare function as global
-            emit(fp,".text","            ","# Directive that says we are in code segment");
-            sprintf(s,".globl %s",p->name);
-            emit(fp,"",s,"#global declaration of function");
-            //insert the label for the function
-            sprintf(s,"%s:",p->name);
-            emit(fp,s,"","");
-
-            //make the activation record
-            //stackval = p->value*WORDSIZE;
-            sprintf(s,"subu $t0, $sp, %d",p->value*WORDSIZE);
-            emit(fp,"",s,"# put where the new sp should be in t0");
-            sprintf(s,"sw  $ra, %d($t0)",1*WORDSIZE);
-            emit(fp,"",s,"# Store return adress into the stack");
-	        emit(fp,"","sw  $sp, ($t0)","# save the old sp");
-	        emit(fp,"","addu $sp, $t0, 0","#move the sp now");
-
-            //recursively do the block inside the dec
-            emitAST(p->right);
-            //we do the return stmt no matter what, if there is
-            //a declared return this block doesn't get executed in asm
-	        emit_return_stmt(p);
-	        break;
+            emit_fundec(p);
+            break;
 
         case EXPR:
             emit_expr(p);
             break;
 
         case RETURNSTMT:
-	    emit_return_stmt(p);
+            emit_return_stmt(p);
             break;
 
         case IDENT:
@@ -595,56 +935,19 @@ void emitAST(ASTnode* p)
             emitAST(p->right);
             break;
 
-
         case READSTMT:
             emit_ident(p->right);
             emit(fp,"","li  $v0,  5"," # read in an integer");
-	        emit(fp,"","syscall"," # call a READ NUMBER FUNCITON");
-	        emit(fp,"","sw  $v0, ($t2)"," # store a READ number in t2");
+            emit(fp,"","syscall"," # call a READ NUMBER FUNCITON");
+            emit(fp,"","sw  $v0, ($t2)"," # store a READ number in t2");
             break;
 
         case WRITESTMT:
-            switch (p->right->type) {
-                case NUMBER:
-		        sprintf(s,"li  $a0, %d",p->right->value);
-		        emit(fp, "",s,"# Write a Number to the screen");
-                emit(fp,"","li  $v0, 1"," #put 1 in v0 to print an integer");
-		        break;
-
-                case EXPR:
-		        emitAST(p->right);
-                sprintf(s, "lw  $a0, %d($sp)",p->right->symbol->offset*WORDSIZE);
-		        emit(fp, "",s," #fetch expr value");
-                emit(fp,"","li  $v0, 1"," #put 1 in v0 to print an integer");
-		        break;
-
-	            case CALLSTMT:
-                emit_callstmt(p->right);
-                emit(fp,"","addu $a0, $v0, 0","#put the return in a0 to write");
-                emit(fp,"","li  $v0, 1"," #put 1 in v0 to print an integer");
-		        break;
-
-                case IDENT:
-		        emit_ident(p->right);
-		        emit(fp, "","lw  $a0, ($t2)"," #put id value in a0");
-                emit(fp,"","li  $v0, 1"," #put 1 in v0 to print an integer");
-		        break;
-
-                case STRINGNODE:
-                emit(fp,"",".data","");
-                sprintf(s,"%s: .asciiz  %s",p->right->name, p->right->str);
-                emit(fp,s,"","");
-                emit(fp,"",".text","");
-                sprintf(s,"la  $a0, %s",p->right->name);
-                emit(fp,"",s,"#Load address of the string");
-                emit(fp,"","li  $v0, 4","#Load 4 to print a string");
-                break;
-	        }
-            emit(fp,"","syscall","");
+            emit_write_stmt(p);
             break;
 
         case ASSIGN:
-	        emit_assignment_stmt(p);
+            emit_assignment_stmt(p);
             break;
 
         case NUMBER:
@@ -656,87 +959,26 @@ void emitAST(ASTnode* p)
         case ITERSTMT:
             emit_iteration(p);
             break;
-/*
-        case PARAM:
-            printf("PARAMETER ");
-            if( p->op == INTDEC )
-                printf("INT");
 
-            if( p->op == VOIDDEC )
-                printf("VOID");
-
-            printf(" %s ",p->name); //name of the parameter
-            if(p->value == -1)
-                printf("[]");
-
-            printf("\n");
-            break;
-*/
         case IFSTMT:
             emit_ifstmt(p);
             break;//end of IFSTMT
 
         case CALLSTMT:
-	    emit_callstmt(p);
-	  break;
-
-/*
-            printf("Function Call  %s\n" , p->name);
-            if (p->right != NULL){
-                //recursively print out args
-                //ASTprint(level+2, p->right);
-                printf("\n");
-            }
-            //args were void
-            else{
-                PT(level+2);
-                printf("(VOID)\n");
-            }
+            emit_callstmt(p);
             break;
 
-        case ARGLIST:
-            printf("ARG\n");
-            //this arg's expression is right, the next arg is at left
-            //it gets there from the main control
-            //ASTprint(level+1, p->right);
-            break;
-*/
         case EXPRSTMT:
-            //do the right hand pointer in this node
-            //can be NUMBER, EXPR, CALL, or VAR, we need the value to be
-            //in t6 when we are done.
-	  //can switch this to a function later
-            switch (p->right->type) {
-                case NUMBER:
-                sprintf(s,"li  $t6, %d",p->right->value);
-                emit(fp,"",s,"#Load number into $t6 for expr stmt");
-                break;
-
-                case EXPR:
-                emitAST(p->right);
-                sprintf(s,"lw  $t6, %d($sp)",p->right->symbol->offset*WORDSIZE);
-                emit(fp,"",s,"#load the value from the stack into t6");
-                break;
-
-                case IDENT:
-                emit_ident(p->right);
-                emit(fp,"","lw  $t6, ($t2)", "#Load the value from the stack into t6 for expr stmt");
-                break;
-
-                case CALLSTMT:
-		        emitAST(p->right);
-                emit(fp,"","addu $t6, $v0, 0","#put the return in t6 to use later");
-                break;
-
-            }
+            emit_expression_stmt(p);
             break;
 
-        default: printf("Unknown type in emitAST\n");
-        //if we hit default there was an error
+        default:
+            fprintf(stderr,"Unknown type in emitAST\n");
+            exit(1);
+            //if we hit default there was an error
             break;
 
         } //end switch p->type
-
         if (p->type != EXPR) //go left for all except expression
             emitAST(p->left);
     }//end else

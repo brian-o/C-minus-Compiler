@@ -8,7 +8,7 @@
 
     Shaun Cooper February 2015
 
-    Edited by Brian O'Dell March 2017
+    Edited and print functionality by Brian O'Dell March 2017
 
     The link to the next node is left, except for expression
 

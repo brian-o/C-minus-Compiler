@@ -106,8 +106,6 @@ varDecl         : typeSpec ID ';'
                         fprintf(stderr, "Making VarDec with name: %s",$2);
                         yyerror(" ");
                     }
-
-
                 }
                 | typeSpec ID '[' NUM ']' ';'
                 {   /* search for symbol, if we find it error*/
@@ -299,7 +297,6 @@ compoundStmt    : '{' { level++; }
                        fprintf(stderr,"     current table...");
                        Display();/*Display after*/
                    }
-
                 }
                 ;
 
@@ -354,7 +351,6 @@ stmt            : expStmt
                         fprintf(stderr, "Converting a selection Statement");
                         yyerror(" ");
                     }
-
                 }
                 | iterStmt
                 {
@@ -364,7 +360,6 @@ stmt            : expStmt
                         fprintf(stderr, "Converting a iteration Statement");
                         yyerror(" ");
                     }
-
                 }
                 | assignStmt
                 {
@@ -763,6 +758,7 @@ int main(int argc, char const *argv[]) {
     if(fp==NULL){
         fprintf(stderr,"Couldn't emit to a.out, try using a file name\n");
         fprintf(stderr,"if this error persists\n");
+        exit(1);
     }
     yyparse();
     /*fprintf(stderr,"\nMain symbol table");

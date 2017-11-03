@@ -892,7 +892,7 @@ void emit_fundec(ASTnode * p)
 *       of helper function must be true for this to work as intended
 * Postconditions:
 *   1.) if p is NULL the function will simply return
-*   2.) After this is called from a "program" AST node all the mips code
+*   2.) After this is called from a "program" node AST node all the mips code
 *       for the program will be emitted.
 *   3.) The driver will handle emission of the current node, and will be
 *       recursively called to hanlde everything below it on the tree. The next
